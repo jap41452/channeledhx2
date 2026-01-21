@@ -1,0 +1,900 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>channeledhx</title>
+
+  <style>
+    :root{
+      --panel:#fff; --bg:#f6f7fb; --ink:#111; --muted:#666; --border:#d9d9d9; --accent:#0b73c8;
+      --radius:12px; --pad:12px; --gap:8px; --input-h:34px;
+    }
+    *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+
+    /* Responsive layout: full-width page; wrap when narrow */
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--ink);
+      padding:16px;
+    }
+    .wrap{
+      display:flex;
+      gap:16px;
+      align-items:flex-start;
+      flex-wrap:wrap;       /* stacks on small screens */
+      width:100%;
+      max-width:none;
+    }
+    .left-col, .right-col{ flex:0 0 auto; }
+    .panel{
+      width:300px; max-width:300px;
+      background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+      padding:var(--pad); box-shadow:0 1px 4px rgba(0,0,0,.06);
+    }
+    @media (max-width: 680px){
+      .wrap{ justify-content:center; }
+      .left-col, .right-col{
+        width:100%;
+        flex-basis:100%;
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+        gap:16px;
+      }
+      .panel{
+        width:100%;
+        max-width:300px;   /* keep "classic" 300px panels, centered */
+        margin:0 auto;
+      }
+    }
+
+    h2{margin:0 0 8px;font-size:16px}
+
+    .controls{display:grid;gap:var(--gap);grid-template-columns:repeat(2,minmax(0,1fr))}
+    .row{display:contents}
+    .field{display:flex;flex-direction:column;gap:4px;min-width:0}
+    label{color:var(--muted);font-size:12px;line-height:1}
+    input,select,button{
+      width:100%;min-width:0;height:var(--input-h);
+      padding:0 10px;font-size:13px;line-height:var(--input-h);
+      border:1px solid var(--border);border-radius:8px;background:#fff;outline:none
+    }
+    input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(11,115,200,.12)}
+    .calc[readonly]{background:#f3f4f6;color:#555;border-color:#e5e7eb}
+
+    .grid-wrap{display:flex;flex-direction:column;gap:8px}
+    .grid-canvas{display:block;width:100%;height:auto;border:1px solid var(--border);border-radius:8px;background:#fff}
+    .legend{font-size:12px;color:#6b7280;display:flex;justify-content:space-between}
+    .hint{font-size:12px;color:#777;margin-top:6px}
+
+    .actions{display:flex;gap:8px;align-items:center}
+    .btn{height:var(--input-h);padding:0 12px;border-radius:8px;border:1px solid var(--border);background:#fff;cursor:pointer}
+    .btn.primary{background:var(--accent);color:#fff;border:none}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+
+    .list{display:flex;flex-direction:column;gap:6px;max-height:160px;overflow:auto}
+    .hs-item{display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;border:1px solid #e5e7eb;border-radius:8px;padding:6px 8px;background:#fafafa}
+    .pill{font-size:11px;color:#555;background:#eef2ff;border:1px solid #dbeafe;padding:2px 6px;border-radius:999px}
+    .del{background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:2px 8px;cursor:pointer}
+    .del:hover{background:#fee2e2;border-color:#fecaca}
+
+    .small{font-size:12px;color:#6b7280}
+    .note{font-size:12px;color:#b91c1c;margin-top:6px}
+
+    .chart{display:none;margin-top:8px;border:1px solid var(--border);border-radius:8px}
+    .chart.pick{outline:2px dashed #0b73c8; outline-offset:3px}
+    .vis-legend{display:flex;justify-content:space-between;font-size:12px;color:#555;margin-top:4px}
+    .key{display:inline-flex;align-items:center;gap:6px}
+    .swatch{width:12px;height:12px;border-radius:2px;display:inline-block}
+
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th,td{padding:6px 6px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap}
+    th:first-child,td:first-child{text-align:center}
+    thead th{position:sticky;top:0;background:#fafafa;z-index:1}
+    .tbl-wrap{max-height:220px;overflow:auto;border:1px solid var(--border);border-radius:8px}
+  </style>
+</head>
+<body>
+
+  <div class="wrap">
+    <!-- LEFT COLUMN -->
+    <div class="left-col">
+      <!-- Setup -->
+      <section class="panel" aria-label="Heat sink setup">
+        <h2>Setup – Plate & Coolant</h2>
+        <div class="controls">
+          <div class="row">
+            <div class="field"><label for="plateWidth">Plate Width (mm)</label><input id="plateWidth" type="number" min="1" step="1" value="200"></div>
+            <div class="field"><label for="plateLength">Length (mm)</label><input id="plateLength" type="number" min="1" step="1" value="200"></div>
+          </div>
+          <div class="row">
+            <div class="field"><label for="plateMaterial">Plate Material</label>
+              <select id="plateMaterial"><option>Aluminum</option><option>Copper</option><option>Stainless Steel</option><option>FRP</option></select>
+            </div>
+            <div class="field"><label for="coolant">Coolant</label>
+              <select id="coolant"><option>Water</option><option>Glycol 50/50 mix</option></select>
+            </div>
+          </div>
+          <div class="row">
+            <div class="field"><label for="flowLpm">Coolant Flow (L/min)</label><input id="flowLpm" type="number" min="0" step="0.1" value="1.5"></div>
+            <div class="field"><label for="inletT">Coolant Inlet T (°C)</label><input id="inletT" type="number" step="0.1" value="25"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Solution panel -->
+      <section class="panel" aria-label="Solution panel">
+        <h2>Solution – Layout & Heat</h2>
+        <div class="controls">
+          <div class="row">
+            <div class="field"><label for="chanB">Channel depth b (mm)</label><input id="chanB" type="number" min="0" step="0.1" value="1.5"></div>
+            <div class="field"><label for="minWall">Wall thickness t (mm)</label><input id="minWall" type="number" min="0" step="0.1" value="1.5"></div>
+          </div>
+          <div class="row">
+            <div class="field"><label for="chanH">Channel width w (mm)</label><input id="chanH" class="calc" type="number" readonly></div>
+            <div class="field"><label for="plateThk">Plate thickness (mm)</label><input id="plateThk" type="number" min="0.2" step="0.1" value="2.0"></div>
+          </div>
+
+          <div class="row">
+            <div class="field" style="grid-column:1 / -1">
+              <label for="lamBC">Laminar BC (fully developed)</label>
+              <select id="lamBC">
+                <option value="T" selected>All walls isothermal (T) – conservative</option>
+                <option value="H2-4">All walls isoflux (H2-4)</option>
+                <option value="H2-1">Top isoflux, others adiabatic (H2-1)</option>
+              </select>
+              <div class="small">Laminar Nu depends on which walls are heated. T gives the lowest h → warmest prediction.</div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="field"><label for="maxCh">Max # of channels</label><input id="maxCh" class="calc" type="number" readonly></div>
+            <div class="field"><label for="minCh">Min # of channels</label><input id="minCh" class="calc" type="number" readonly></div>
+          </div>
+
+          <div class="row">
+            <div class="field" style="grid-column:1 / -1">
+              <label>Heat Sources, W <span class="hint">(Click <b>Add</b>, then drag on the grid)</span></label>
+              <div class="actions"><button id="btnAddHS" class="btn primary" type="button">Add</button><button id="btnClearHS" class="btn" type="button">Clear</button></div>
+              <div id="hsList" class="list" aria-live="polite"></div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="field" style="grid-column:1 / -1"><label for="totalHeat">Total Heat Load (W)</label><input id="totalHeat" class="calc" type="number" readonly value="0"></div>
+          </div>
+
+          <div class="row">
+            <div class="field"><label>&nbsp;</label><button id="btnSolve" class="btn primary" type="button">Solve</button></div>
+            <div class="field"><label>&nbsp;</label><button id="btnContours" class="btn" type="button">T Contours</button></div>
+          </div>
+
+          <div class="row" style="grid-column:1 / -1">
+            <div class="field" style="grid-column:1 / -1">
+              <canvas id="chart" class="chart" width="276" height="170"></canvas>
+              <div id="chartLegend" class="vis-legend" style="display:none">
+                <span class="key"><span class="swatch" style="background:#0b73c8"></span>Max T (°C)</span>
+                <span class="key"><span class="swatch" style="background:#e11d48"></span>ΔP (kPa)</span>
+              </div>
+              <div id="solveNote" class="small"></div>
+            </div>
+          </div>
+
+          <div class="row" style="grid-column:1 / -1">
+            <div class="field"><label>&nbsp;</label><button id="btnCSV" class="btn" type="button">CSV</button></div>
+            <div class="field"><label>&nbsp;</label><button id="btnJSON" class="btn" type="button">JSON</button></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div class="right-col" style="display:flex;flex-direction:column;gap:16px">
+      <section class="panel" aria-label="Plate grid guide">
+        <h2>Plate Grid</h2>
+        <div class="grid-wrap">
+          <canvas id="gridCanvas" class="grid-canvas"></canvas>
+          <div class="legend"><span id="sizeReadout">—</span><span id="tickReadout">—</span></div>
+        </div>
+      </section>
+
+      <section class="panel" aria-label="Channel end view">
+        <h2>Channel End View (Min #)</h2>
+        <canvas id="endView" class="grid-canvas"></canvas>
+        <div class="legend"><span id="endSummary">—</span><span id="endNote" class="small"></span></div>
+      </section>
+
+      <section class="panel" aria-label="Solve status">
+        <h2>Solve Status</h2>
+        <div class="tbl-wrap">
+          <table aria-describedby="solveNote">
+            <thead>
+              <tr><th>N</th><th>BC</th><th>Re</th><th>Nu</th><th>h (W/m²K)</th><th>ΔP (kPa)</th><th>T₍ₘₐₓ₎ (°C)</th></tr>
+            </thead>
+            <tbody id="statusBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" aria-label="Temperature contours">
+        <h2>Temperature Contours</h2>
+        <canvas id="contourCanvas" class="grid-canvas"></canvas>
+        <div class="legend"><span id="contourSummary">Click "T Contours" then pick a chart point.</span><span id="contourNote" class="small"></span></div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+/* ---- Simple iframe height messenger (matches your parent) ---- */
+(function () {
+  function pageHeight() {
+    const d = document;
+    const b = d.body, e = d.documentElement;
+    return Math.max(
+      b ? b.scrollHeight : 0,
+      e.scrollHeight,
+      b ? b.offsetHeight : 0,
+      e.offsetHeight,
+      b ? b.clientHeight : 0,
+      e.clientHeight
+    );
+  }
+
+  function sendHeight() {
+    try {
+      window.parent.postMessage({ iframeHeight: pageHeight() }, "*");
+    } catch (_) {}
+  }
+
+  // on load + resize
+  window.addEventListener("load", () => {
+    sendHeight();
+    // small heartbeat in case the parent listener attaches a bit late
+    let n = 0, t = setInterval(() => { sendHeight(); if (++n >= 6) clearInterval(t); }, 500);
+  });
+  window.addEventListener("resize", sendHeight);
+
+  // also react to DOM changes (panels opening, list updates, etc.)
+  if (typeof MutationObserver !== "undefined") {
+    new MutationObserver(sendHeight).observe(document.documentElement, {
+      childList: true, subtree: true, attributes: true, characterData: true
+    });
+  }
+})();
+
+/* ===== DOM ===== */
+const plateWidth   = document.getElementById('plateWidth');
+const plateLength  = document.getElementById('plateLength');
+const plateMaterial= document.getElementById('plateMaterial');
+const coolantSel   = document.getElementById('coolant');
+const flowLpm      = document.getElementById('flowLpm');
+const inletT       = document.getElementById('inletT');
+
+const gridCanvas   = document.getElementById('gridCanvas');
+const sizeReadout  = document.getElementById('sizeReadout');
+const tickReadout  = document.getElementById('tickReadout');
+
+const maxCh    = document.getElementById('maxCh');
+const minCh    = document.getElementById('minCh');
+const chanB    = document.getElementById('chanB');
+const minWall  = document.getElementById('minWall');
+const chanH    = document.getElementById('chanH');
+const plateThk = document.getElementById('plateThk');
+const lamBC    = document.getElementById('lamBC');
+
+const btnAddHS = document.getElementById('btnAddHS');
+const btnClearHS = document.getElementById('btnClearHS');
+const hsList   = document.getElementById('hsList');
+const totalHeat= document.getElementById('totalHeat');
+
+const btnSolve = document.getElementById('btnSolve');
+const btnContours = document.getElementById('btnContours');
+const chart    = document.getElementById('chart');
+const chartLegend = document.getElementById('chartLegend');
+const solveNote = document.getElementById('solveNote');
+
+const btnCSV   = document.getElementById('btnCSV');
+const btnJSON  = document.getElementById('btnJSON');
+
+const endView  = document.getElementById('endView');
+const endSummary = document.getElementById('endSummary');
+const endNote    = document.getElementById('endNote');
+
+const statusBody = document.getElementById('statusBody');
+
+const contourCanvas = document.getElementById('contourCanvas');
+const contourSummary = document.getElementById('contourSummary');
+const contourNote = document.getElementById('contourNote');
+
+/* ===== State ===== */
+let heatSources = []; // {id,x,y,w,h,W}
+let drawing=false, dragStart=null, pendingAdd=false;
+let lastSweep=null; // {Ns, TmaxC, dPkPa, Re, Nu, h, bcUsed, Tfields:{[N]:{nx,ny,L,W,T,Tmin,Tmax,bc}}}
+let selectionMode=false;
+let chartPts=[]; // {x,y,i}
+
+/* ===== Helpers ===== */
+function parseNum(el,fallback){ const v=parseFloat(el.value); return (isFinite(v)?v:fallback); }
+function niceStep(maxVal,targetTicks=9){
+  const raw=maxVal/targetTicks, p10=Math.pow(10,Math.floor(Math.log10(raw)));
+  const n=raw/p10; let m; if(n<1.5)m=1; else if(n<3.5)m=2; else if(n<7.5)m=5; else m=10; return m*p10;
+}
+const mm2m=function(v){ return v/1000; };
+const clamp=function(v,a,b){ return Math.max(a,Math.min(b,v)); };
+
+/* ===== Materials & Fluids ===== */
+function plateK(material){ switch(material){ case 'Copper': return 390; case 'Stainless Steel': return 16; case 'FRP': return 0.3; default: return 180; } }
+function fluidProps(name){
+  if(name==='Glycol 50/50 mix'){ const rho=1040, mu=0.0049, k=0.37, cp=3300; return {rho:rho,mu:mu,k:k,cp:cp,Pr:(mu*cp/k)}; }
+  const rho=997, mu=0.00089, k=0.6, cp=4180; return {rho:rho,mu:mu,k:k,cp:cp,Pr:(mu*cp/k)};
+}
+
+/* ===== Grid & transforms (Plate Grid) ===== */
+let x0=0,y0=0,plotW=0,plotH=0,Lmm=200,Wmm=200;
+function xToPx(x){ return x0 + (x / Lmm) * plotW; }
+function yToPx(y){ return (y0 + plotH) - (y / Wmm) * plotH; }
+function pxToX(px){ return ((px - x0) / plotW) * Lmm; }
+function pxToY(py){ return (((y0 + plotH) - py) / plotH) * Wmm; }
+
+function drawGrid(){
+  Wmm=parseNum(plateWidth,200); Lmm=parseNum(plateLength,200);
+  const panel=gridCanvas.parentElement.parentElement;
+  const pad=parseFloat(getComputedStyle(panel).paddingLeft)+parseFloat(getComputedStyle(panel).paddingRight);
+  const innerW=panel.clientWidth - pad;
+
+  const m={left:36,right:8,top:10,bottom:22};
+  plotW=Math.max(10, innerW - (m.left+m.right));
+  plotH=Math.max(10, plotW * (Wmm/Lmm));
+
+  gridCanvas.width=Math.round(m.left+plotW+m.right);
+  gridCanvas.height=Math.round(m.top+plotH+m.bottom);
+
+  const ctx=gridCanvas.getContext('2d');
+  ctx.clearRect(0,0,gridCanvas.width,gridCanvas.height);
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,gridCanvas.width,gridCanvas.height);
+  ctx.strokeStyle='#d9d9d9';ctx.strokeRect(0.5,0.5,gridCanvas.width-1,gridCanvas.height-1);
+
+  x0=m.left;y0=m.top; const x1=x0+plotW, y1=y0+plotH;
+  const majorX=niceStep(Lmm,9), majorY=niceStep(Wmm,9), minorDiv=5;
+
+  ctx.save();ctx.lineWidth=1;ctx.strokeStyle='#eeeeee';ctx.beginPath();
+  for(let x=0;x<=Lmm+1e-6;x+=majorX/minorDiv){const px=Math.round(xToPx(x))+0.5;ctx.moveTo(px,y0);ctx.lineTo(px,y1);}
+  for(let y=0;y<=Wmm+1e-6;y+=majorY/minorDiv){const py=Math.round(yToPx(y))+0.5;ctx.moveTo(x0,py);ctx.lineTo(x1,py);} ctx.stroke();ctx.restore();
+
+  ctx.save();ctx.lineWidth=1;ctx.strokeStyle='#cfd4dc';ctx.beginPath();
+  for(let x=0;x<=Lmm+1e-6;x+=majorX){const px=Math.round(xToPx(x))+0.5;ctx.moveTo(px,y0);ctx.lineTo(px,y1);}
+  for(let y=0;y<=Wmm+1e-6;y+=majorY){const py=Math.round(yToPx(y))+0.5;ctx.moveTo(x0,py);ctx.lineTo(x1,py);} ctx.stroke();ctx.restore();
+
+  ctx.save();ctx.lineWidth=2;ctx.strokeStyle='#0b73c8';
+  ctx.strokeRect(Math.round(x0)+0.5, Math.round(y0)+0.5, Math.round(plotW), Math.round(plotH));
+  ctx.restore();
+
+  ctx.save();ctx.fillStyle='#111';ctx.font='11px system-ui,-apple-system,Segoe UI,Roboto,sans-serif';
+  ctx.textAlign='center';ctx.textBaseline='top';
+  for(let x=0;x<=Lmm+1e-6;x+=majorX){ctx.fillText(x.toFixed(0), xToPx(x), y1+4);}
+  ctx.textAlign='right';ctx.textBaseline='middle';
+  for(let y=0;y<=Wmm+1e-6;y+=majorY){ctx.fillText(y.toFixed(0), x0-6, yToPx(y));}
+  ctx.fillStyle='#666';ctx.textAlign='center';ctx.fillText('x (mm)', (x0+x1)/2, y1+16);
+  ctx.save();ctx.translate(x0-26, (y0+y1)/2);ctx.rotate(-Math.PI/2);ctx.fillText('y (mm)', 0, 0);ctx.restore();ctx.restore();
+
+  drawHeatOverlays(ctx);
+  sizeReadout.textContent='Plate: ' + Wmm + ' mm (W) × ' + Lmm + ' mm (L)';
+  tickReadout.textContent='Major: Δx=' + majorX + ' mm, Δy=' + majorY + ' mm';
+  drawEndView();
+}
+
+/* ===== Heat sources UI/overlay ===== */
+const HS_COLORS=['#e11d48','#0ea5e9','#22c55e','#f59e0b','#8b5cf6'];
+function drawHeatOverlays(ctx){
+  heatSources.forEach(function(hs,idx){
+    const color=HS_COLORS[idx%HS_COLORS.length];
+    const x=xToPx(hs.x), y=yToPx(hs.y+hs.h);
+    const w=xToPx(hs.x+hs.w)-xToPx(hs.x);
+    const h=yToPx(hs.y)-yToPx(hs.y+hs.h);
+    ctx.save();
+    ctx.fillStyle=hexToRgba(color,0.18); ctx.strokeStyle=color; ctx.lineWidth=2;
+    ctx.fillRect(x,y,w,h); ctx.strokeRect(x+0.5,y+0.5,w-1,h-1);
+    ctx.fillStyle=color; ctx.fillRect(x+4,y+4,24,16);
+    ctx.fillStyle='#fff'; ctx.font='11px system-ui,sans-serif'; ctx.textBaseline='top'; ctx.textAlign='left'; ctx.fillText(String(idx+1), x+9, y+5);
+    ctx.fillStyle='#111'; ctx.textBaseline='bottom'; ctx.textAlign='left'; ctx.fillText(hs.W.toFixed(0) + ' W', x+6, y+h-6);
+    ctx.restore();
+  });
+}
+function hexToRgba(hex,a){const m=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex); if(!m) return 'rgba(0,0,0,'+a+')';
+  const r=parseInt(m[1],16), g=parseInt(m[2],16), b=parseInt(m[3],16); return 'rgba('+r+','+g+','+b+','+a+')'; }
+
+btnAddHS.addEventListener('click', function(){ if(heatSources.length>=5){alert('Limit reached: up to 5 heat sources.'); return;}
+  pendingAdd=true; btnAddHS.textContent='Adding… (drag on grid)'; btnAddHS.disabled=true; });
+btnClearHS.addEventListener('click', function(){ heatSources=[]; refreshHSList(); updateTotalHeat(); drawGrid(); });
+
+function refreshHSList(){
+  hsList.innerHTML='';
+  if(!heatSources.length){ hsList.innerHTML='<div class="small">No heat sources yet. Click Add → drag on grid.</div>'; return; }
+  heatSources.forEach(function(hs,idx){
+    const color=HS_COLORS[idx%HS_COLORS.length];
+    const d=document.createElement('div'); d.className='hs-item';
+    const info=document.createElement('div'); info.style.display='flex'; info.style.gap='4px'; info.style.alignItems='center';
+    const num=document.createElement('span'); num.textContent=String(idx+1); num.style.fontWeight='600'; num.style.color=color;
+    const pill=document.createElement('span'); pill.className='pill'; pill.textContent=hs.W.toFixed(0)+' W';
+    info.appendChild(num); info.appendChild(pill);
+    const coords=document.createElement('span'); coords.className='small'; coords.textContent='('+hs.x.toFixed(0)+','+hs.y.toFixed(0)+') '+hs.w.toFixed(0)+'×'+hs.h.toFixed(0)+' mm';
+    const delBtn=document.createElement('button'); delBtn.className='del'; delBtn.textContent='×'; delBtn.setAttribute('aria-label','Delete heat source');
+    delBtn.addEventListener('click', function(){ heatSources.splice(idx,1); refreshHSList(); updateTotalHeat(); drawGrid(); });
+    d.appendChild(info); d.appendChild(coords); d.appendChild(delBtn); hsList.appendChild(d);
+  });
+}
+function updateTotalHeat(){ let s=0; heatSources.forEach(function(h){s+=h.W;}); totalHeat.value=s.toFixed(2); }
+
+gridCanvas.addEventListener('mousedown', function(e){
+  if(!pendingAdd) return;
+  const rect=gridCanvas.getBoundingClientRect(); const px=e.clientX-rect.left, py=e.clientY-rect.top;
+  const xx=pxToX(px), yy=pxToY(py);
+  if(xx<0 || xx>Lmm || yy<0 || yy>Wmm) return;
+  drawing=true; dragStart={x:xx,y:yy};
+});
+gridCanvas.addEventListener('mousemove', function(e){
+  if(!drawing) return;
+  const rect=gridCanvas.getBoundingClientRect(); const px=e.clientX-rect.left, py=e.clientY-rect.top;
+  const xx=pxToX(px), yy=pxToY(py);
+  drawGrid();
+  const ctx=gridCanvas.getContext('2d');
+  const x1=Math.min(dragStart.x, xx), x2=Math.max(dragStart.x, xx);
+  const y1=Math.min(dragStart.y, yy), y2=Math.max(dragStart.y, yy);
+  ctx.save(); ctx.strokeStyle='#0b73c8'; ctx.lineWidth=2; ctx.setLineDash([5,5]);
+  const rx=xToPx(x1), ry=yToPx(y2), rw=xToPx(x2)-xToPx(x1), rh=yToPx(y1)-yToPx(y2);
+  ctx.strokeRect(rx+0.5,ry+0.5,rw,rh); ctx.restore();
+});
+gridCanvas.addEventListener('mouseup', function(e){
+  if(!drawing) return;
+  drawing=false;
+  const rect=gridCanvas.getBoundingClientRect(); const px=e.clientX-rect.left, py=e.clientY-rect.top;
+  const xx=pxToX(px), yy=pxToY(py);
+  const x1=Math.min(dragStart.x, xx), x2=Math.max(dragStart.x, xx);
+  const y1=Math.min(dragStart.y, yy), y2=Math.max(dragStart.y, yy);
+  const w=x2-x1, h=y2-y1;
+  if(w>1 && h>1){
+    const W=parseFloat(prompt('Heat dissipation for this region (W):','50'));
+    if(isFinite(W) && W>0){ heatSources.push({id:Date.now(),x:x1,y:y1,w:w,h:h,W:W}); refreshHSList(); updateTotalHeat(); }
+  }
+  pendingAdd=false; btnAddHS.textContent='Add'; btnAddHS.disabled=false;
+  drawGrid();
+});
+gridCanvas.addEventListener('mouseleave', function(){
+  if(drawing){ drawing=false; pendingAdd=false; btnAddHS.textContent='Add'; btnAddHS.disabled=false; drawGrid(); }
+});
+
+/* ===== Channel layout ===== */
+function updateChannelCounts(){
+  const W=parseNum(plateWidth,200), b=parseNum(chanB,1.5), t=parseNum(minWall,1.5);
+  if(b<=0 || t<=0){ maxCh.value=''; minCh.value=''; chanH.value=''; return; }
+  const Nmax=Math.floor((W+t)/(b+t));
+  const Nmin=Math.ceil((W+t)/(2*b+t));
+  maxCh.value=Nmax; minCh.value=Nmin;
+  if(Nmin>0){ const w=((W+t)/Nmin)-t; chanH.value=w.toFixed(3); }
+  else { chanH.value=''; }
+}
+
+/* ===== Channel end-view drawing ===== */
+function drawEndView(){
+  const W=parseNum(plateWidth,200), b=parseNum(chanB,1.5), t=parseNum(minWall,1.5), plateT=parseNum(plateThk,2.0);
+  const Nmin=parseInt(minCh.value,10); if(!Nmin || Nmin<1){ endSummary.textContent='—'; return; }
+  const w=parseFloat(chanH.value);
+  const panel=endView.parentElement; const pad=parseFloat(getComputedStyle(panel).paddingLeft)+parseFloat(getComputedStyle(panel).paddingRight);
+  const innerW=panel.clientWidth - pad;
+
+  const m={left:10,right:10,top:10,bottom:10};
+  const viewW=Math.max(10, innerW - (m.left+m.right));
+  const totalH=plateT+b; const viewH=Math.max(10, viewW*(totalH/(W+2*t)));
+  endView.width=Math.round(m.left+viewW+m.right); endView.height=Math.round(m.top+viewH+m.bottom);
+
+  const ctx=endView.getContext('2d');
+  ctx.clearRect(0,0,endView.width,endView.height);
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,endView.width,endView.height);
+  ctx.strokeStyle='#d9d9d9'; ctx.strokeRect(0.5,0.5,endView.width-1,endView.height-1);
+
+  const x0e=m.left, y0e=m.top;
+  const Xp=function(mm){ return x0e + (mm/(W+2*t))*viewW; };
+  const Yp=function(mm){ return (y0e+viewH) - (mm/totalH)*viewH; };
+
+  ctx.save(); ctx.fillStyle='#e5e7eb';
+  ctx.fillRect(Xp(0), Yp(plateT+b), Xp(W+2*t)-Xp(0), Yp(0)-Yp(plateT+b));
+  ctx.restore();
+
+  ctx.save(); ctx.fillStyle='#fff';
+  for(let i=0;i<Nmin;i++){
+    const xStart=t + i*(w+t);
+    const rx=Xp(xStart), ry=Yp(b+plateT), rw=Xp(xStart+w)-Xp(xStart), rh=Yp(plateT)-Yp(b+plateT);
+    ctx.fillRect(rx,ry,rw,rh);
+  }
+  ctx.restore();
+
+  ctx.save(); ctx.strokeStyle='#0b73c8'; ctx.lineWidth=1.5;
+  for(let i=0;i<Nmin;i++){
+    const xStart=t + i*(w+t);
+    const rx=Xp(xStart), ry=Yp(b+plateT), rw=Xp(xStart+w)-Xp(xStart), rh=Yp(plateT)-Yp(b+plateT);
+    ctx.strokeRect(rx+0.5,ry+0.5,rw,rh);
+  }
+  ctx.restore();
+
+  ctx.save(); ctx.strokeStyle='#999'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+  const plateLine=Yp(plateT);
+  ctx.beginPath(); ctx.moveTo(x0e,plateLine); ctx.lineTo(x0e+viewW,plateLine); ctx.stroke();
+  ctx.restore();
+
+  endSummary.textContent='N='+Nmin+', w='+w.toFixed(2)+'mm, b='+b.toFixed(2)+'mm, t='+t.toFixed(2)+'mm';
+  endNote.textContent='Plate thickness '+plateT.toFixed(2)+' mm shown below.';
+}
+
+/* ===== Solver (parametric sweep N) ===== */
+btnSolve.addEventListener('click', runSolve);
+function runSolve(){
+  if(heatSources.length<1){ alert('Please add at least one heat source.'); return; }
+  runParametricSweep();
+}
+
+function runParametricSweep(){
+  const Lm=mm2m(parseNum(plateLength,200)), Wm=mm2m(parseNum(plateWidth,200));
+  const bm=mm2m(parseNum(chanB,1.5)), tm=mm2m(parseNum(minWall,1.5)), plateTm=mm2m(parseNum(plateThk,2.0));
+  const kPlate=plateK(plateMaterial.value);
+  const fluid=fluidProps(coolantSel.value);
+  const Qlpm=parseNum(flowLpm,1.5), Tin=parseNum(inletT,25);
+  const Qm3s=(Qlpm/1000)/60, Achan=bm*(((Wm+tm)/(parseInt(minCh.value,10)))-tm);
+  const Vavg=(Qm3s/Achan)/(parseInt(minCh.value,10) || 1);
+
+  const Nmin=parseInt(minCh.value,10), Nmax=parseInt(maxCh.value,10);
+  if(!Nmin || Nmin<1 || !Nmax || Nmax<Nmin){alert('Invalid channel counts.'); return;}
+
+  const Ns=[], Re=[], Nu=[], h=[], dPkPa=[], TmaxC=[], bcUsed=[];
+  const Tfields={};
+
+  for(let N=Nmin; N<=Nmax; N++){
+    const wm=((Wm+tm)/N)-tm; const Dh=4*wm*bm/(2*(wm+bm));
+    const A=wm*bm; const vel=(Qm3s/A)/N; const ReN=(fluid.rho*vel*Dh)/fluid.mu;
+    let NuN, bc;
+    if(ReN<2300){
+      const bcVal=lamBC.value; bc=bcVal;
+      if(bcVal==='H2-4') NuN=3.608; else if(bcVal==='H2-1') NuN=4.439; else NuN=2.976;
+    } else {
+      bc='Turbulent (Gnielinski)';
+      const f=(0.79*Math.log(ReN)-1.64)**(-2);
+      NuN=((f/8)*(ReN-1000)*fluid.Pr)/(1+12.7*Math.sqrt(f/8)*(fluid.Pr**(2/3)-1));
+    }
+    const hN=(NuN*fluid.k)/Dh;
+    let Qtot=0; heatSources.forEach(function(hs){Qtot+=hs.W;});
+    const dTcoolant=(Qtot)/(N*fluid.rho*(Qm3s/N)*fluid.cp);
+    const Tavg=Tin + dTcoolant/2;
+    const Rconv=1/(hN*wm*Lm);
+    const Rcond=(plateTm)/(kPlate*wm*Lm);
+    const Rtot=Rconv+Rcond;
+    const nx=50, ny=50;
+    const dx=Lm/(nx-1), dy=Wm/(ny-1);
+    const T=[];
+    for(let j=0;j<ny;j++){ T[j]=[]; for(let i=0;i<nx;i++){ T[j][i]=Tavg; } }
+    let maxIter=500, tol=1e-4;
+    for(let iter=0;iter<maxIter;iter++){
+      const Told=T.map(function(r){return r.slice();});
+      for(let j=0;j<ny;j++){
+        for(let i=0;i<nx;i++){
+          const xc=i*dx, yc=j*dy;
+          let qVol=0;
+          heatSources.forEach(function(hs){
+            const x1=mm2m(hs.x), x2=mm2m(hs.x+hs.w);
+            const y1=mm2m(hs.y), y2=mm2m(hs.y+hs.h);
+            if(xc>=x1 && xc<=x2 && yc>=y1 && yc<=y2){
+              qVol=hs.W/(mm2m(hs.w)*mm2m(hs.h)*plateTm);
+            }
+          });
+          let Tn=0, cnt=0;
+          if(i>0){ Tn+=Told[j][i-1]; cnt++; }
+          if(i<nx-1){ Tn+=Told[j][i+1]; cnt++; }
+          if(j>0){ Tn+=Told[j-1][i]; cnt++; }
+          if(j<ny-1){ Tn+=Told[j+1][i]; cnt++; }
+          if(cnt>0) Tn/=cnt; else Tn=Told[j][i];
+          if(j===0){ Tn=(Tavg + (qVol*dy*dy/(2*kPlate)))/(1 + (dy/(Rtot*kPlate))); }
+          T[j][i]=Tn + (qVol*dx*dx)/(6*kPlate);
+        }
+      }
+      let maxDiff=0;
+      for(let j=0;j<ny;j++){for(let i=0;i<nx;i++){maxDiff=Math.max(maxDiff,Math.abs(T[j][i]-Told[j][i]));}}
+      if(maxDiff<tol) break;
+    }
+    let Tmin=T[0][0], Tmax=T[0][0];
+    for(let j=0;j<ny;j++){for(let i=0;i<nx;i++){if(T[j][i]<Tmin)Tmin=T[j][i]; if(T[j][i]>Tmax)Tmax=T[j][i];}}
+    const f=0.079/(ReN**0.25); const dP=(f*Lm/Dh)*(fluid.rho*vel*vel/2);
+    const dPkPaN=dP/1000;
+
+    Ns.push(N); Re.push(ReN.toFixed(0)); Nu.push(NuN.toFixed(2)); h.push(hN.toFixed(0)); dPkPa.push(dPkPaN.toFixed(2)); TmaxC.push(Tmax.toFixed(2)); bcUsed.push(bc);
+    Tfields[N]={nx:nx,ny:ny,L:Lm,W:Wm,T:T,Tmin:Tmin,Tmax:Tmax,bc:bc,N:N};
+  }
+
+  lastSweep={Ns:Ns,TmaxC:TmaxC,dPkPa:dPkPa,Re:Re,Nu:Nu,h:h,bcUsed:bcUsed,Tfields:Tfields};
+  refreshStatusTable();
+  drawSweepChart();
+  solveNote.textContent='Sweep complete ('+Ns.length+' points). Click CSV/JSON to export.';
+}
+
+function refreshStatusTable(){
+  if(!lastSweep){ statusBody.innerHTML=''; return; }
+  statusBody.innerHTML='';
+  for(let i=0;i<lastSweep.Ns.length;i++){
+    const tr=document.createElement('tr');
+    tr.innerHTML='<td>'+lastSweep.Ns[i]+'</td><td>'+lastSweep.bcUsed[i]+'</td><td>'+lastSweep.Re[i]+'</td><td>'+lastSweep.Nu[i]+'</td><td>'+lastSweep.h[i]+'</td><td>'+lastSweep.dPkPa[i]+'</td><td>'+lastSweep.TmaxC[i]+'</td>';
+    statusBody.appendChild(tr);
+  }
+}
+
+function drawSweepChart(){
+  if(!lastSweep) return;
+  chart.style.display='block'; chartLegend.style.display='flex';
+  const ctx=chart.getContext('2d'); const w=chart.width, h=chart.height;
+  ctx.clearRect(0,0,w,h); ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
+
+  const m={left:40,right:10,top:10,bottom:30};
+  const plotW=w-(m.left+m.right), plotH=h-(m.top+m.bottom);
+  const x0c=m.left, y0c=m.top;
+
+  const Nmin=Math.min(...lastSweep.Ns), Nmax=Math.max(...lastSweep.Ns);
+  const TmaxVals=lastSweep.TmaxC.map(function(v){return parseFloat(v);});
+  const dPVals=lastSweep.dPkPa.map(function(v){return parseFloat(v);});
+  const Tmin=Math.min(...TmaxVals), Tmax=Math.max(...TmaxVals);
+  const dPmin=Math.min(...dPVals), dPmax=Math.max(...dPVals);
+
+  const xPx=function(N){ return x0c + ((N-Nmin)/(Nmax-Nmin))*plotW; };
+  const yPxT=function(T){ return (y0c+plotH) - ((T-Tmin)/(Tmax-Tmin))*plotH; };
+  const yPxDP=function(dP){ return (y0c+plotH) - ((dP-dPmin)/(dPmax-dPmin))*plotH; };
+
+  ctx.save(); ctx.strokeStyle='#e5e7eb'; ctx.lineWidth=1; ctx.beginPath();
+  for(let i=0;i<=5;i++){ const py=y0c+i*(plotH/5); ctx.moveTo(x0c,py); ctx.lineTo(x0c+plotW,py); } ctx.stroke(); ctx.restore();
+
+  ctx.save(); ctx.strokeStyle='#0b73c8'; ctx.lineWidth=2; ctx.beginPath();
+  for(let i=0;i<lastSweep.Ns.length;i++){
+    const px=xPx(lastSweep.Ns[i]), py=yPxT(TmaxVals[i]);
+    if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  } ctx.stroke(); ctx.restore();
+
+  ctx.save(); ctx.strokeStyle='#e11d48'; ctx.lineWidth=2; ctx.setLineDash([5,5]); ctx.beginPath();
+  for(let i=0;i<lastSweep.Ns.length;i++){
+    const px=xPx(lastSweep.Ns[i]), py=yPxDP(dPVals[i]);
+    if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  } ctx.stroke(); ctx.restore();
+
+  chartPts=[];
+  ctx.save(); ctx.fillStyle='#0b73c8';
+  for(let i=0;i<lastSweep.Ns.length;i++){
+    const px=xPx(lastSweep.Ns[i]), py=yPxT(TmaxVals[i]);
+    ctx.beginPath(); ctx.arc(px,py,3,0,2*Math.PI); ctx.fill();
+    chartPts.push({x:px,y:py,i:i});
+  } ctx.restore();
+
+  ctx.save(); ctx.fillStyle='#111'; ctx.font='11px system-ui,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='top';
+  for(let i=0;i<lastSweep.Ns.length;i++){ const px=xPx(lastSweep.Ns[i]); ctx.fillText(lastSweep.Ns[i], px, y0c+plotH+4); }
+  ctx.textAlign='center'; ctx.fillText('N (channels)', x0c+plotW/2, y0c+plotH+18);
+  ctx.restore();
+
+  ctx.save(); ctx.fillStyle='#666'; ctx.font='11px system-ui,sans-serif'; ctx.textAlign='right'; ctx.textBaseline='middle';
+  for(let i=0;i<=5;i++){ const py=y0c+i*(plotH/5); const T=Tmin+(Tmax-Tmin)*(1-i/5); ctx.fillText(T.toFixed(1), x0c-6, py); }
+  ctx.restore();
+}
+
+/* ===== Contour selection mode ===== */
+btnContours.addEventListener('click', function(){
+  if(!lastSweep){ alert('Please solve first.'); return; }
+  if(!selectionMode){
+    selectionMode=true; btnContours.textContent='Cancel selection';
+    chart.classList.add('pick');
+    contourSummary.textContent='Click a point on the chart above.';
+  } else {
+    selectionMode=false; btnContours.textContent='T Contours';
+    chart.classList.remove('pick');
+    contourSummary.textContent='Click "T Contours" then pick a chart point.';
+  }
+});
+
+chart.addEventListener('click', function(e){
+  if(!selectionMode || !lastSweep) return;
+  const rect=chart.getBoundingClientRect(); const px=e.clientX-rect.left, py=e.clientY-rect.top;
+  let chosen=null, minD=999;
+  chartPts.forEach(function(pt){
+    const d=Math.sqrt((pt.x-px)**2 + (pt.y-py)**2);
+    if(d<minD && d<10){ minD=d; chosen=pt; }
+  });
+  if(!chosen) return;
+  const N=lastSweep.Ns[chosen.i];
+  const fld=lastSweep.Tfields[N];
+  if(!fld) return;
+  renderContourPanel(fld);
+  selectionMode=false; btnContours.textContent='T Contours'; chart.classList.remove('pick');
+});
+
+/* ===== Export ===== */
+btnCSV.addEventListener('click', function(){
+  if(!lastSweep){ alert('Please click Solve first.'); return; }
+  const rows=[['N','BC','Re','Nu','h_Wm2K','dP_kPa','Tmax_C']];
+  for(let i=0;i<lastSweep.Ns.length;i++){
+    rows.push([
+      lastSweep.Ns[i],
+      lastSweep.bcUsed[i],
+      lastSweep.Re[i],
+      lastSweep.Nu[i],
+      lastSweep.h[i],
+      lastSweep.dPkPa[i],
+      lastSweep.TmaxC[i]
+    ]);
+  }
+  const csv = rows.map(function(r){return r.join(',');}).join('\n');
+  downloadText('hx_sweep_'+Date.now()+'.csv', 'text/csv', csv);
+});
+
+btnJSON.addEventListener('click', function(){
+  if(!lastSweep){ alert('Please click Solve first.'); return; }
+  var inputs = {
+    plate: {
+      width_mm: parseFloat(plateWidth.value) || 200,
+      length_mm: parseFloat(plateLength.value) || 200,
+      material: plateMaterial.value,
+      thickness_mm: parseFloat(plateThk.value) || 2.0
+    },
+    channels: {
+      depth_b_mm: parseFloat(chanB.value) || 1.5,
+      wall_t_mm: parseFloat(minWall.value) || 1.5,
+      laminar_BC: lamBC.value
+    },
+    coolant: {
+      type: coolantSel.value,
+      flow_Lpm: parseFloat(flowLpm.value) || 0,
+      inlet_C: parseFloat(inletT.value) || 25
+    },
+    heat_sources: heatSources
+  };
+  var results = [];
+  for (var i = 0; i < lastSweep.Ns.length; i++){
+    var N = lastSweep.Ns[i];
+    var fld = (lastSweep.Tfields && lastSweep.Tfields[N]) ? lastSweep.Tfields[N] : null;
+    var TminC = (fld && typeof fld.Tmin === 'number') ? fld.Tmin : null;
+    results.push({
+      N: N,
+      BC: lastSweep.bcUsed[i],
+      Re: lastSweep.Re[i],
+      Nu: lastSweep.Nu[i],
+      h_Wm2K: lastSweep.h[i],
+      dP_kPa: lastSweep.dPkPa[i],
+      Tmax_C: lastSweep.TmaxC[i],
+      Tmin_C: TminC
+    });
+  }
+  var payload = {
+    exported_at: new Date().toISOString(),
+    units: { h: 'W/m^2-K', dP: 'kPa', T: 'degC' },
+    inputs: inputs,
+    results: results
+  };
+  downloadText('hx_sweep_' + Date.now() + '.json', 'application/json', JSON.stringify(payload, null, 2));
+});
+
+function downloadText(filename, mime, text){
+  const blob = new Blob([text], {type: mime});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/* ===== Contour panel (heatmap rendering) ===== */
+function renderContourPanel(field){
+  // frame + axes
+  const WmmLoc = parseNum(plateWidth,200);
+  const LmmLoc = parseNum(plateLength,200);
+  const panel=contourCanvas.parentElement;
+  const pad=parseFloat(getComputedStyle(panel).paddingLeft)+parseFloat(getComputedStyle(panel).paddingRight);
+  const innerW=panel.clientWidth - pad;
+
+  const m={left:36,right:8,top:10,bottom:22};
+  const plotWpx=Math.max(10, innerW - (m.left+m.right));
+  const plotHpx=Math.max(10, plotWpx * (WmmLoc/LmmLoc));
+  contourCanvas.width=Math.round(m.left+plotWpx+m.right);
+  contourCanvas.height=Math.round(m.top+plotHpx+m.bottom);
+
+  const ctx=contourCanvas.getContext('2d');
+  ctx.clearRect(0,0,contourCanvas.width,contourCanvas.height);
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,contourCanvas.width,contourCanvas.height);
+  ctx.strokeStyle='#d9d9d9'; ctx.strokeRect(0.5,0.5,contourCanvas.width-1,contourCanvas.height-1);
+
+  const x0c=m.left, y0c=m.top;
+  const Xpx = function(x){ return x0c + (x / LmmLoc) * plotWpx; };
+  const Ypx = function(y){ return (y0c + plotHpx) - (y / WmmLoc) * plotHpx; };
+
+  // light grid
+  const majorX=niceStep(LmmLoc,9), majorY=niceStep(WmmLoc,9), minorDiv=5;
+  ctx.save(); ctx.lineWidth=1; ctx.strokeStyle='#eeeeee'; ctx.beginPath();
+  for(let x=0;x<=LmmLoc+1e-6;x+=majorX/minorDiv){const px=Math.round(Xpx(x))+0.5;ctx.moveTo(px,y0c);ctx.lineTo(px,y0c+plotHpx);}
+  for(let y=0;y<=WmmLoc+1e-6;y+=majorY/minorDiv){const py=Math.round(Ypx(y))+0.5;ctx.moveTo(x0c,py);ctx.lineTo(x0c+plotWpx,py);} ctx.stroke(); ctx.restore();
+  ctx.save(); ctx.lineWidth=1; ctx.strokeStyle='#cfd4dc'; ctx.beginPath();
+  for(let x=0;x<=LmmLoc+1e-6;x+=majorX){const px=Math.round(Xpx(x))+0.5;ctx.moveTo(px,y0c);ctx.lineTo(px,y0c+plotHpx);}
+  for(let y=0;y<=WmmLoc+1e-6;y+=majorY){const py=Math.round(Ypx(y))+0.5;ctx.moveTo(x0c,py);ctx.lineTo(x0c+plotWpx,py);} ctx.stroke(); ctx.restore();
+
+  // heatmap (blue->red) from field.T (ny x nx)
+  const img = ctx.createImageData(Math.round(plotWpx), Math.round(plotHpx));
+  const nx   = field.nx;
+  const ny   = field.ny;
+  const L    = field.L;
+  const W    = field.W;
+  const T    = field.T;
+  const Tmin = field.Tmin;
+  const Tmax = field.Tmax;
+  const N    = field.N;
+  const bc   = field.bc;
+
+  for(let py=0; py<img.height; py++){
+    const y_m = (1 - (py/(img.height-1))) * W; // bottom=0 → top=W
+    const v = (y_m / W)*ny - 0.5; const j0 = Math.floor(v); const tj = clamp(v - j0, 0, 1);
+    const jA = clamp(j0, 0, ny-1), jB = clamp(j0+1, 0, ny-1);
+    for(let px=0; px<img.width; px++){
+      const x_m = (px/(img.width-1)) * L;
+      const u = (x_m / L)*nx - 0.5; const i0 = Math.floor(u); const ti = clamp(u - i0, 0, 1);
+      const iA = clamp(i0, 0, nx-1), iB = clamp(i0+1, 0, nx-1);
+      const T00=T[jA][iA], T10=T[jA][iB], T01=T[jB][iA], T11=T[jB][iB];
+      const Ttop = T00*(1-ti) + T10*ti;
+      const Tbot = T01*(1-ti) + T11*ti;
+      const Tpx  = Ttop*(1-tj) + Tbot*tj;
+
+      const s = (Tpx - Tmin) / Math.max(1e-12, (Tmax - Tmin));
+      const col = jet(s);
+      const r = col[0], g = col[1], b_ = col[2];
+      const k = 4*(py*img.width + px);
+      img.data[k+0]=r; img.data[k+1]=g; img.data[k+2]=b_; img.data[k+3]=255;
+    }
+  }
+  ctx.putImageData(img, x0c, y0c);
+
+  // bounding box
+  ctx.strokeStyle='#0b73c8'; ctx.lineWidth=2;
+  ctx.strokeRect(Math.round(x0c)+0.5, Math.round(y0c)+0.5, Math.round(plotWpx), Math.round(plotHpx));
+
+  // axes labels
+  ctx.save(); ctx.fillStyle='#111'; ctx.font='11px system-ui,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='top';
+  for(let x=0;x<=LmmLoc+1e-6;x+=majorX){ctx.fillText(x.toFixed(0), Xpx(x), y0c+plotHpx+4);}
+  ctx.textAlign='right'; ctx.textBaseline='middle';
+  for(let y=0;y<=WmmLoc+1e-6;y+=majorY){ctx.fillText(y.toFixed(0), x0c-6, Ypx(y));}
+  ctx.fillStyle='#666'; ctx.textAlign='center'; ctx.fillText('x (mm)', Xpx(LmmLoc/2), y0c+plotHpx+16);
+  ctx.save(); ctx.translate(x0c-26, y0c+plotHpx/2); ctx.rotate(-Math.PI/2); ctx.fillText('y (mm)', 0, 0); ctx.restore(); ctx.restore();
+
+  // summary text
+  contourSummary.textContent = 'N='+N+', BC='+bc+' • T: '+Tmin.toFixed(2)+'–'+Tmax.toFixed(2)+' °C';
+}
+
+function jet(s){
+  s = clamp(s,0,1);
+  // Simple JET-like (blue→cyan→yellow→red)
+  const r = Math.round(255 * clamp(1.5 - Math.abs(4*s - 3), 0, 1));
+  const g = Math.round(255 * clamp(1.5 - Math.abs(4*s - 2), 0, 1));
+  const b = Math.round(255 * clamp(1.5 - Math.abs(4*s - 1), 0, 1));
+  return [r,g,b];
+}
+
+/* ===== Events & init ===== */
+function onDimsChange(){ updateChannelCounts(); drawGrid(); drawEndView(); }
+['input','change'].forEach(function(evt){
+  plateWidth.addEventListener(evt, onDimsChange);
+  plateLength.addEventListener(evt, drawGrid);
+  chanB.addEventListener(evt, drawEndView);
+  minWall.addEventListener(evt, drawEndView);
+  plateThk.addEventListener(evt, drawEndView);
+  lamBC.addEventListener(evt, function(){ if(lastSweep) runSolve(); });
+  plateMaterial.addEventListener(evt, function(){});
+  coolantSel.addEventListener(evt, function(){});
+  flowLpm.addEventListener(evt, function(){});
+  inletT.addEventListener(evt, function(){});
+});
+window.addEventListener('resize', function(){ drawGrid(); drawEndView(); });
+
+document.addEventListener('DOMContentLoaded', function(){
+  updateChannelCounts(); drawGrid(); drawEndView(); refreshHSList(); updateTotalHeat();
+});
+  </script>
+</body>
+</html>
