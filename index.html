@@ -1,10 +1,10 @@
-<!doctype html>
+ <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>channeledhx</title>
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <style>
     :root{
       --panel:#fff; --bg:#f6f7fb; --ink:#111; --muted:#666; --border:#d9d9d9; --accent:#0b73c8;
@@ -171,6 +171,19 @@
             <div class="field"><label>&nbsp;</label><button id="btnContours" class="btn" type="button">T Contours</button></div>
           </div>
 
+<div class="row" style="grid-column:1 / -1">
+  <div class="field"><label>&nbsp;</label><button id="btnExportJSON" class="btn" type="button">Export JSON</button></div>
+  <div class="field"><label>&nbsp;</label><button id="btnImportJSON" class="btn" type="button">Import JSON</button></div>
+</div>
+
+<div class="row" style="grid-column:1 / -1">
+  <div class="field"><label>&nbsp;</label><button id="btnExportCSV" class="btn" type="button">Export CSV</button></div>
+  <div class="field"><label>&nbsp;</label><button id="btnExportZip" class="btn" type="button">Export Zip</button></div>
+</div>
+
+<input type="file" id="fileInput" accept=".json" style="display:none">
+
+
           <div class="row" style="grid-column:1 / -1">
             <div class="field" style="grid-column:1 / -1">
               <canvas id="chart" class="chart" width="276" height="170"></canvas>
@@ -182,10 +195,9 @@
             </div>
           </div>
 
-          <div class="row" style="grid-column:1 / -1">
-            <div class="field"><label>&nbsp;</label><button id="btnCSV" class="btn" type="button">CSV</button></div>
-            <div class="field"><label>&nbsp;</label><button id="btnJSON" class="btn" type="button">JSON</button></div>
-          </div>
+
+
+
         </div>
       </section>
     </div>
@@ -295,8 +307,13 @@ const chart    = document.getElementById('chart');
 const chartLegend = document.getElementById('chartLegend');
 const solveNote = document.getElementById('solveNote');
 
-const btnCSV   = document.getElementById('btnCSV');
-const btnJSON  = document.getElementById('btnJSON');
+const btnExportJSON = document.getElementById('btnExportJSON');
+const btnImportJSON = document.getElementById('btnImportJSON');
+const btnExportCSV = document.getElementById('btnExportCSV');
+const btnExportZip = document.getElementById('btnExportZip');
+const fileInput = document.getElementById('fileInput');
+
+
 
 const endView  = document.getElementById('endView');
 const endSummary = document.getElementById('endSummary');
@@ -709,10 +726,130 @@ chart.addEventListener('click', function(e){
 });
 
 /* ===== Export ===== */
-btnCSV.addEventListener('click', function(){
+
+/* ===== Helper function to get timestamp ===== */
+function getTimestamp() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  return `${year}${month}${day}_${hours}${minutes}${seconds}`;
+}
+
+/* ===== Export JSON with all input data ===== */
+btnExportJSON.addEventListener('click', function(){
+  const exportData = {
+    exported_at: new Date().toISOString(),
+    timestamp: getTimestamp(),
+    inputs: {
+      plate: {
+        width_mm: parseFloat(plateWidth.value) || 200,
+        length_mm: parseFloat(plateLength.value) || 200,
+        material: plateMaterial.value,
+        thickness_mm: parseFloat(plateThk.value) || 2.0
+      },
+      channels: {
+        depth_b_mm: parseFloat(chanB.value) || 1.5,
+        wall_t_mm: parseFloat(minWall.value) || 1.5,
+        laminar_BC: lamBC.value
+      },
+      coolant: {
+        type: coolantSel.value,
+        flow_Lpm: parseFloat(flowLpm.value) || 1.5,
+        inlet_C: parseFloat(inletT.value) || 25
+      },
+      heat_sources: heatSources
+    },
+    results: lastSweep ? {
+      Ns: lastSweep.Ns,
+      TmaxC: lastSweep.TmaxC,
+      dPkPa: lastSweep.dPkPa,
+      Re: lastSweep.Re,
+      Nu: lastSweep.Nu,
+      h: lastSweep.h,
+      bcUsed: lastSweep.bcUsed
+    } : null
+  };
+  
+  const filename = `hx_config_${getTimestamp()}.json`;
+  downloadText(filename, 'application/json', JSON.stringify(exportData, null, 2));
+});
+
+/* ===== Import JSON to repopulate inputs ===== */
+btnImportJSON.addEventListener('click', function(){
+  fileInput.click();
+});
+
+fileInput.addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = function(event){
+    try {
+      const data = JSON.parse(event.target.result);
+      
+      // Repopulate plate inputs
+      if (data.inputs && data.inputs.plate) {
+        plateWidth.value = data.inputs.plate.width_mm || 200;
+        plateLength.value = data.inputs.plate.length_mm || 200;
+        plateMaterial.value = data.inputs.plate.material || 'Aluminum';
+        plateThk.value = data.inputs.plate.thickness_mm || 2.0;
+      }
+      
+      // Repopulate channel inputs
+      if (data.inputs && data.inputs.channels) {
+        chanB.value = data.inputs.channels.depth_b_mm || 1.5;
+        minWall.value = data.inputs.channels.wall_t_mm || 1.5;
+        lamBC.value = data.inputs.channels.laminar_BC || 'T';
+      }
+      
+      // Repopulate coolant inputs
+      if (data.inputs && data.inputs.coolant) {
+        coolantSel.value = data.inputs.coolant.type || 'Water';
+        flowLpm.value = data.inputs.coolant.flow_Lpm || 1.5;
+        inletT.value = data.inputs.coolant.inlet_C || 25;
+      }
+      
+      // Repopulate heat sources
+      if (data.inputs && data.inputs.heat_sources) {
+        heatSources = data.inputs.heat_sources;
+        refreshHSList();
+        updateTotalHeat();
+      }
+      
+      // Refresh displays
+      updateChannelCounts();
+      drawGrid();
+      drawEndView();
+      
+      alert('Configuration loaded successfully!');
+      
+    } catch (err) {
+      alert('Error loading JSON file: ' + err.message);
+    }
+    
+    // Reset file input
+    fileInput.value = '';
+  };
+  
+  reader.readAsText(file);
+});
+
+/* ===== Export CSV with results data ===== */
+btnExportCSV.addEventListener('click', function(){
   if(!lastSweep){ alert('Please click Solve first.'); return; }
-  const rows=[['N','BC','Re','Nu','h_Wm2K','dP_kPa','Tmax_C']];
-  for(let i=0;i<lastSweep.Ns.length;i++){
+  
+  const rows = [['N', 'BC', 'Re', 'Nu', 'h_Wm2K', 'dP_kPa', 'Tmax_C', 'Tmin_C']];
+  
+  for(let i = 0; i < lastSweep.Ns.length; i++){
+    const N = lastSweep.Ns[i];
+    const fld = (lastSweep.Tfields && lastSweep.Tfields[N]) ? lastSweep.Tfields[N] : null;
+    const TminC = (fld && typeof fld.Tmin === 'number') ? fld.Tmin.toFixed(2) : '';
+    
     rows.push([
       lastSweep.Ns[i],
       lastSweep.bcUsed[i],
@@ -720,58 +857,95 @@ btnCSV.addEventListener('click', function(){
       lastSweep.Nu[i],
       lastSweep.h[i],
       lastSweep.dPkPa[i],
-      lastSweep.TmaxC[i]
+      lastSweep.TmaxC[i],
+      TminC
+    ]);
+  }
+  
+  const csv = rows.map(function(r){return r.join(',');}).join('\n');
+  const filename = `hx_results_${getTimestamp()}.csv`;
+  downloadText(filename, 'text/csv', csv);
+});
+
+/* ===== Export Zip with CSV and images ===== */
+btnExportZip.addEventListener('click', async function(){
+  if(!lastSweep){ alert('Please click Solve first.'); return; }
+  
+  // Check if JSZip is available
+  if (typeof JSZip === 'undefined') {
+    alert('JSZip library not loaded. Adding script...');
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    script.onload = function() {
+      alert('JSZip loaded! Please click Export Zip again.');
+    };
+    document.head.appendChild(script);
+    return;
+  }
+  
+  const zip = new JSZip();
+  const timestamp = getTimestamp();
+  
+  // Add CSV file
+  const rows = [['N', 'BC', 'Re', 'Nu', 'h_Wm2K', 'dP_kPa', 'Tmax_C', 'Tmin_C']];
+  for(let i = 0; i < lastSweep.Ns.length; i++){
+    const N = lastSweep.Ns[i];
+    const fld = (lastSweep.Tfields && lastSweep.Tfields[N]) ? lastSweep.Tfields[N] : null;
+    const TminC = (fld && typeof fld.Tmin === 'number') ? fld.Tmin.toFixed(2) : '';
+    rows.push([
+      lastSweep.Ns[i],
+      lastSweep.bcUsed[i],
+      lastSweep.Re[i],
+      lastSweep.Nu[i],
+      lastSweep.h[i],
+      lastSweep.dPkPa[i],
+      lastSweep.TmaxC[i],
+      TminC
     ]);
   }
   const csv = rows.map(function(r){return r.join(',');}).join('\n');
-  downloadText('hx_sweep_'+Date.now()+'.csv', 'text/csv', csv);
+  zip.file(`hx_results_${timestamp}.csv`, csv);
+  
+  // Add grid canvas image
+  const gridDataUrl = gridCanvas.toDataURL('image/png');
+  const gridBase64 = gridDataUrl.split(',')[1];
+  zip.file(`grid_${timestamp}.png`, gridBase64, {base64: true});
+  
+  // Add chart image if visible
+  if (chart.style.display !== 'none') {
+    const chartDataUrl = chart.toDataURL('image/png');
+    const chartBase64 = chartDataUrl.split(',')[1];
+    zip.file(`chart_${timestamp}.png`, chartBase64, {base64: true});
+  }
+  
+  // Add end view image
+  const endViewDataUrl = endView.toDataURL('image/png');
+  const endViewBase64 = endViewDataUrl.split(',')[1];
+  zip.file(`end_view_${timestamp}.png`, endViewBase64, {base64: true});
+  
+  // Add contour canvas if it has content
+  if (contourCanvas.width > 0 && contourCanvas.height > 0) {
+    const contourDataUrl = contourCanvas.toDataURL('image/png');
+    const contourBase64 = contourDataUrl.split(',')[1];
+    zip.file(`contour_${timestamp}.png`, contourBase64, {base64: true});
+  }
+  
+  // Generate zip file
+  try {
+    const content = await zip.generateAsync({type: 'blob'});
+    const url = URL.createObjectURL(content);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `hx_export_${timestamp}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert('Error creating zip file: ' + err.message);
+  }
 });
 
-btnJSON.addEventListener('click', function(){
-  if(!lastSweep){ alert('Please click Solve first.'); return; }
-  var inputs = {
-    plate: {
-      width_mm: parseFloat(plateWidth.value) || 200,
-      length_mm: parseFloat(plateLength.value) || 200,
-      material: plateMaterial.value,
-      thickness_mm: parseFloat(plateThk.value) || 2.0
-    },
-    channels: {
-      depth_b_mm: parseFloat(chanB.value) || 1.5,
-      wall_t_mm: parseFloat(minWall.value) || 1.5,
-      laminar_BC: lamBC.value
-    },
-    coolant: {
-      type: coolantSel.value,
-      flow_Lpm: parseFloat(flowLpm.value) || 0,
-      inlet_C: parseFloat(inletT.value) || 25
-    },
-    heat_sources: heatSources
-  };
-  var results = [];
-  for (var i = 0; i < lastSweep.Ns.length; i++){
-    var N = lastSweep.Ns[i];
-    var fld = (lastSweep.Tfields && lastSweep.Tfields[N]) ? lastSweep.Tfields[N] : null;
-    var TminC = (fld && typeof fld.Tmin === 'number') ? fld.Tmin : null;
-    results.push({
-      N: N,
-      BC: lastSweep.bcUsed[i],
-      Re: lastSweep.Re[i],
-      Nu: lastSweep.Nu[i],
-      h_Wm2K: lastSweep.h[i],
-      dP_kPa: lastSweep.dPkPa[i],
-      Tmax_C: lastSweep.TmaxC[i],
-      Tmin_C: TminC
-    });
-  }
-  var payload = {
-    exported_at: new Date().toISOString(),
-    units: { h: 'W/m^2-K', dP: 'kPa', T: 'degC' },
-    inputs: inputs,
-    results: results
-  };
-  downloadText('hx_sweep_' + Date.now() + '.json', 'application/json', JSON.stringify(payload, null, 2));
-});
 
 function downloadText(filename, mime, text){
   const blob = new Blob([text], {type: mime});
@@ -898,3 +1072,4 @@ document.addEventListener('DOMContentLoaded', function(){
   </script>
 </body>
 </html>
+
